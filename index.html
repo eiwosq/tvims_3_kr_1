@@ -40,6 +40,9 @@
     .section { margin:34px 0 38px; }
     .section-title { display:flex; justify-content:space-between; gap:10px; align-items:center; margin:0 0 19px; }
     .section-title h2 { margin:0; font-size:22px; letter-spacing:-.02em; }
+    .group-heading { display:flex; align-items:center; gap:12px; margin:16px 0 12px; }
+    .group-heading h3 { margin:0; font-size:17px; letter-spacing:-.02em; }
+    .task-group + .task-group { margin-top:30px; padding-top:14px; border-top:1px solid var(--line); }
     .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(560px, 1fr)); gap:18px; }
     .task { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:18px; min-height:260px; display:flex; flex-direction:column; gap:13px; cursor:default; transition:.15s ease; overflow:visible; }
     .task:hover { transform:translateY(-1px); border-color:color-mix(in srgb, var(--accent) 35%, var(--line)); }
@@ -369,6 +372,7 @@
     const SOURCES_KEY = 'tvims3-kr1-sources-2026';
     const NEW_SOURCE_SEED_KEY = 'tvims3-kr1-myaumiau-2025-source-seed-v1';
     const state = { tab: 'memo', query: '', status: 'all', sources: new Set(SOURCES) };
+    const scrollPositions = Object.fromEntries(['memo','textbook','seminars','leaked','theory'].map(tab=>[tab,{page:0,content:0}]));
     let progress = {};
     let memoryStorage = {};
     const $ = id => document.getElementById(id);
@@ -405,6 +409,23 @@
     function toggleTheme() {
       document.body.dataset.theme=document.body.dataset.theme==='dark'?'light':'dark';
       storageSet(THEME_KEY,document.body.dataset.theme); updateThemeButton();
+    }
+    function saveScrollPosition(tab=state.tab) {
+      const position=scrollPositions[tab];
+      if(!position)return;
+      position.page=window.scrollY;
+      if(tab==='theory')position.content=document.querySelector('.theory-content')?.scrollTop||0;
+    }
+    function restoreScrollPosition(tab) {
+      const position=scrollPositions[tab]||{page:0,content:0};
+      requestAnimationFrame(()=>{
+        window.scrollTo(0,position.page);
+        if(tab==='theory') {
+          const scroller=document.querySelector('.theory-content');
+          if(scroller)scroller.scrollTop=position.content;
+          updateActiveTheorySection();
+        }
+      });
     }
     function getStatus(id) { return ['todo','repeat','done'].includes(progress[id])?progress[id]:'todo'; }
     function statusLabel(st) { return st==='done'?'Выполнено':st==='repeat'?'Повторить':'Не выполнено'; }
@@ -453,15 +474,32 @@
       </article>`;
     }
     function renderTasks() {
-      let last=null;
       const sections=[];
       for(const t of TASKS) {
         if(!taskVisible(t)) continue;
-        if(last!==t.source) { sections.push({name:t.source,tasks:[]});last=t.source; }
-        sections[sections.length-1].tasks.push(t);
+        const sectionName=state.tab==='leaked'?t.source.replace(/\s*·\s*Вариант\s+.+$/,''):t.source;
+        let section=sections.at(-1);
+        if(!section || section.name!==sectionName) {
+          section={name:sectionName,groups:[]};
+          sections.push(section);
+        }
+        const groupName=state.tab==='leaked'?(t.group||t.source.split(' · ').at(-1)):'';
+        let group=section.groups.at(-1);
+        if(!group || group.name!==groupName) {
+          group={name:groupName,tasks:[]};
+          section.groups.push(group);
+        }
+        group.tasks.push(t);
       }
       if(!sections.length)return '<div class="empty">По выбранным условиям задач не найдено.</div>';
-      return sections.map(sec=>`<section class="section"><div class="section-title"><h2>${escapeHtml(sec.name)}</h2><span class="pill">${sec.tasks.length} задач</span></div><div class="grid">${sec.tasks.map(renderTaskCard).join('')}</div></section>`).join('');
+      return sections.map(sec=>{
+        const count=sec.groups.reduce((sum,group)=>sum+group.tasks.length,0);
+        const groups=sec.groups.map(group=>state.tab==='leaked'
+          ? `<div class="task-group"><div class="group-heading"><h3>${escapeHtml(group.name)}</h3><span class="pill">${group.tasks.length} задач</span></div><div class="grid">${group.tasks.map(renderTaskCard).join('')}</div></div>`
+          : `<div class="grid">${group.tasks.map(renderTaskCard).join('')}</div>`
+        ).join('');
+        return `<section class="section"><div class="section-title"><h2>${escapeHtml(sec.name)}</h2><span class="pill">${count} задач</span></div>${groups}</section>`;
+      }).join('');
     }
     function renderTheory() {
       const q=normalize(state.query);
@@ -606,7 +644,9 @@
     }
     function listen() {
       document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>{
-        state.tab=btn.dataset.tab;window.scrollTo(0,0);render();
+        const tab=btn.dataset.tab;
+        if(tab===state.tab)return;
+        saveScrollPosition();state.tab=tab;render();restoreScrollPosition(tab);
       }));
       $('themeToggle').addEventListener('click',toggleTheme);
       $('search').addEventListener('input',e=>{state.query=e.target.value;render();});
