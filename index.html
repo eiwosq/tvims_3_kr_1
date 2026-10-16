@@ -302,9 +302,41 @@
     mjx-container[jax="SVG"][display="true"] { display:block; text-align:center; margin:.35em 0; }
     mjx-container[jax="SVG"][display="true"] > svg { max-width:none; }
     .task .math, .theory-card .formula, .theory-card .math { overflow-x:auto; }
+
+    /* Compact navigation and narrow-screen layout overrides. */
+    #pageTitle { display:none !important; }
+    .topbar {
+      height:54px;
+      min-height:54px;
+      display:flex;
+      flex-direction:row;
+      flex-wrap:nowrap;
+      align-items:center;
+      justify-content:flex-start;
+      gap:12px;
+      padding:0;
+      overflow-x:auto;
+      overflow-y:hidden;
+      scrollbar-width:thin;
+    }
+    .topbar h1,.topbar .tabs,.topbar .theme-toggle { grid-column:auto; grid-row:auto; flex:0 0 auto; }
+    .topbar h1 { white-space:nowrap; }
+    .topbar .tabs { justify-content:flex-start; justify-self:auto; overflow:visible; width:auto; padding:0; margin-left:auto; }
+    .topbar::-webkit-scrollbar,.theory-nav::-webkit-scrollbar { height:7px; }
+    .theory-nav { scrollbar-width:thin; }
+    @media(max-width:1100px) {
+      .topbar { height:54px; min-height:54px; padding:0; }
+      body.theory-page main.wrap { height:calc(100vh - 54px); }
+    }
+    @media(max-width:900px) {
+      .theory-nav { scrollbar-width:thin; padding-bottom:7px; }
+      .theory-nav::-webkit-scrollbar { display:block; }
+      .memo-card,.memo-card.metric-card,.memo-card.block-metric { grid-column:1/-1; }
+    }
+    @media(max-width:560px) { body.theory-page main.wrap { height:calc(100vh - 54px); } }
   </style>
 </head>
-<body>
+<body data-theme="dark">
   <header>
     <div class="wrap topbar">
       <h1>ТВиМС 3 — КР 1 (2026)</h1>
@@ -402,7 +434,7 @@
         storageSet(SOURCES_KEY,JSON.stringify([...state.sources]));
         storageSet(NEW_SOURCE_SEED_KEY,'1');
       }
-      document.body.dataset.theme = storageGet(THEME_KEY)==='dark' ? 'dark' : 'light';
+      document.body.dataset.theme = storageGet(THEME_KEY)==='light' ? 'light' : 'dark';
       updateThemeButton();
     }
     function updateThemeButton() { $('themeToggle').textContent=document.body.dataset.theme==='dark'?'☀️ Светлая':'🌙 Тёмная'; }
@@ -637,7 +669,7 @@
     }
     function copyTask(id) {
       const t=TASKS.find(t=>t.id===id);if(!t)return;
-      const raw=t.no+'. '+t.raw;
+      const raw=t.raw.trim();
       if(navigator.clipboard && window.isSecureContext)
         navigator.clipboard.writeText(raw).then(()=>toast()).catch(()=>fallbackCopy(raw));
       else fallbackCopy(raw);
